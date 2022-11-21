@@ -17,12 +17,14 @@ namespace ToDoAPI.Controllers
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly IAuthorizationService _authService;
         private readonly IDataProtector _dataProtector;
         private readonly CookieOptions _cookieOptions; // to able to correctly delete the cookie, cookieOptions must be similar in both append and delete operator.
 
-        public UserController(IUserService userService, IDataProtectionProvider provider)
+        public UserController(IUserService userService, IDataProtectionProvider provider, IAuthorizationService authorizationService)
         {
             _userService = userService;
+            _authService = authorizationService;
             _dataProtector = provider.CreateProtector("brearer_token_in_cookie.v1");
             _cookieOptions = new CookieOptions();
             _cookieOptions.HttpOnly = true;
@@ -109,6 +111,17 @@ namespace ToDoAPI.Controllers
         [Route("/api/user-password")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordModel model)
         {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            var authResult = await _authService.AuthorizeAsync(User, "GuestAccount");
+            if (!authResult.Succeeded)
+            {
+                var Message = authResult.Failure.FailureReasons.Select(m => m.Message);
+                return new ObjectResult(null)
+                {
+                    StatusCode = 403,
+                    Value = new { Message = Message },
+                };
+            }
             Guid userId;
             Guid.TryParse(User.FindFirst(c => c.Type == "userId")?.Value, out userId);
             var response = await _userService.ChangePasswordAsync(userId, model.OldPassword, model.NewPassword);
@@ -139,9 +152,20 @@ namespace ToDoAPI.Controllers
         public async Task<IActionResult> ChangeEmail([FromBody] ChangeEmailModel model)
         {
            if (!ModelState.IsValid) return BadRequest(ModelState);
+            var authResult = await _authService.AuthorizeAsync(User, "GuestAccount");
+            if (!authResult.Succeeded)
+            {
+                var Message = authResult.Failure.FailureReasons.Select(m=>m.Message);
+                return new ObjectResult(null)
+                {
+                    StatusCode = 403,
+                    Value = new { Message = Message},
+                };
+            }
             Guid userId;
             Guid.TryParse(User.FindFirst(c => c.Type == "userId")?.Value, out userId);
             var response = await _userService.ChangeEmailAsync(userId, model.NewEmail, model.Password);
+
             return response.GenerateActionResult();
         }
     }

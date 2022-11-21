@@ -101,7 +101,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     };
 });
 
-builder.Services.AddSingleton<IAuthorizationHandler, AllowChangeDataHandler>();
+builder.Services.AddSingleton<IAuthorizationHandler, CheckGuestAccountHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, ValidTokenHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, CheckTaskOwnershipHandler>();
 
@@ -120,6 +120,12 @@ builder.Services.AddAuthorization(options =>
          builder.AddRequirements(new CheckTaskOwnershipRequirement());
      }
     );
+    options.AddPolicy("GuestAccount", builder =>
+    {
+        builder.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);
+        
+        builder.AddRequirements(new CheckGuestAccountRequirement());
+    });
 });
 
 builder.Services.AddScoped<IUserService, UserService>();
